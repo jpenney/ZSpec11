@@ -60,6 +60,14 @@ limitation was an artificial one imposed by the Inform compiler - this has
 now been addressed by a compiler patch.
 
 
+Padding
+-------
+The standard currently states that story file padding beyond the length
+specified in the header must be all zero bytes. Many Infocom story files in
+fact contain non-zero data in the padding, so interpreters must be sure to
+exclude the padding from checksum calculations.
+
+
 Character set
 -------------
 In the past, not just in the Z-machine world, there has been general
@@ -205,6 +213,14 @@ interpreter authors must support it in Version 5. Support in Version 6 is not
 required.
 
 
+Operand evaluation
+------------------
+Opcode operands are always evaluated from first to last - this order is
+important when the stack pointer appears as an argument. Thus
+"@sub sp sp" subtracts the second-from-top stack item from the topmost
+stack item.
+
+
 Indirect variable references
 ----------------------------
 In the seven opcodes that take indirect variable references (inc, dec,
@@ -213,12 +229,50 @@ pointer does not push or pull the top item of the stack - it is read
 or written in place.
 
 
+@je
+---
+je can take between 2 and 4 operands. je with just 1 operand is not
+permitted.
+
+
 @art_shift and @log_shift
 -------------------------
 The "places" operand must be in the range -15 to +15, otherwise behaviour
 is undefined. (This is because most interpreters will be implementing the
 opcodes using C's << and >> operators, and this is the range of ISO C
 standard-defined behaviour for shifts of a 16-bit type).
+
+
+@jump
+-----
+The destination of the jump opcode is
+
+   Address after instruction + Offset - 2
+
+This is analogous to the calculation for branch offsets.
+
+
+@read
+-----
+Read must return 13 when terminated by the user pressing "enter". See
+section 3.
+
+
+@scan_table
+-----------
+The dictionary of opcodes currently states that bit 8 of form indicates
+words - this should be bit 7.
+
+
+@tokenise
+---------
+The dictionary and flag operands of tokenise are optional.
+
+
+Output streams
+--------------
+Section 7.1.2 is incorrect - output streams 3 and 4 are present only in
+Version 5 and later.
 
 
 Version 6 windows
@@ -365,6 +419,13 @@ In Version 6, a single click, or the first click of a double-click, is passed
 in as 254. The second click of a double-click is passed in as 253.
 
 
+Mouse co-ordinates
+------------------
+Mouse co-ordinates, whether returned by the @read_mouse opcode or written
+into the header during input, are always relative to the top of the display
+at (1,1), regardless of the position of the current mouse window.
+
+
 @picture_data
 -------------
 @picture_data 0 branches if any pictures are available.
@@ -477,6 +538,25 @@ must remember accurately the colour pair selected, so it is preserved across
 window switches.
 
 
+Status line redraw
+------------------
+The bit in the header described as "requesting status line redraw" would
+better be described as "requesting screen redraw". This may be set by
+modern interpreters after, for example, resizing the "screen"; games should
+ideally redraw the screen if they see this bit set. This will usually mean
+the game clears the screen contents and rearranges borders, etc, so the bit
+should not be set except when necessary.
+
+Behaviour after loading
+-----------------------
+Given the existence of Quetzal, a portable saved file format, it is quite
+possible that after loading, the game may be running on a different
+interpreter to that on which the game started. As a result, it is strongly
+advisable to recheck any interpreter capabilities (eg Standard version,
+unicode support, etc) after loading.
+
+
+
                                 ADDITIONS
                                 =========
 
@@ -491,9 +571,10 @@ distributed as
  
 To minimise user confusion, Standard 1.1 interpreters should be able to run
 Z-code executables contained in either a plain story file, or embedded in a
-stand-alone Blorb file. If the interpreter supports sound or graphics, it
+stand-alone Blorb 1.1 file. If the interpreter supports sound or graphics, it
 should be able to obtain those resources from either a stand-alone or
-separate Blorb file (although the Standard does not preclude other formats).
+separate Blorb 1.1 file (although the Standard does not preclude other
+formats).
 
 Embedded interpreters, or interpreters running on small platforms, may accept
 either Z-code or resources in some custom format, but these should come with
@@ -504,8 +585,31 @@ interpreter, this might take the form of a Blorb to story file converter.
 Quetzal
 -------
 Quetzal is the standard saved game format for the Z-machine. Standard 1.1
-interpreters are recommended to save games in Quetzal format (by default),
-and to be able to load both compressed and uncompressed Quetzal files.
+interpreters are recommended to be able to load Quetzal 1.4 files, and
+to save games in Quetzal 1.4 format by default.
+
+
+Large V6 and V7 files
+---------------------
+Standard 1.1 permits Version 6 and 7 story files to be up to 576K in size.
+
+To allow this, without invalidating any existing story files, the
+interpretation of the "story size field" in the header is modified as
+follows:
+
+If the value stored at location $1A is zero, then the actual story size, for
+the purpose of error checking, memory allocation and verifying, is the length
+of the story file (which equals the length of the ZCOD chunk, if embedded in
+Blorb).
+
+When creating a story file, header location $1A must be filled in with the
+correct value, unless the correct value would be >= $10000 (only possible for
+V6/V7), in which case it must be filled in with zero.
+
+In practice, large V6/V7 files with $1A set to zero will work correctly on
+many existing interpreters. Most existing interpreters only examine the story
+size field for VERIFY, and/or already carry out the prescribed behaviour if
+size is set to zero.
 
 
 Header Extension
@@ -765,12 +869,12 @@ regardless of machine type, in both Version 5 and Version 6:
   0 = current     (true -2)
   1 = default     (true -1)
   2 = black       (true $0000, $$0000000000000000)
-  3 = red         (true $001F, $$0000000000011111)
-  4 = green       (true $03E0, $$0000001111100000)
-  5 = yellow      (true $03FF, $$0000001111111111)
-  6 = blue        (true $7C00, $$0111110000000000)
+  3 = red         (true $001D, $$0000000000011101)
+  4 = green       (true $0340, $$0000001101000000)
+  5 = yellow      (true $03BD, $$0000001110111101)
+  6 = blue        (true $59A0, $$0101100110100000)
   7 = magenta     (true $7C1F, $$0111110000011111)
-  8 = cyan        (true $7FE0, $$0111111111100000)
+  8 = cyan        (true $77A0, $$0111011110100000)
   9 = white       (true $7FFF, $$0111111111111111)
  10 = light grey  (true $5AD6, $$0101101011010110)
  11 = medium grey (true $4631, $$0100011000110001)
@@ -779,12 +883,18 @@ regardless of machine type, in both Version 5 and Version 6:
  14  reserved
  15 = transparent (true -4) [V6 only]
 
-This is the original Amiga Version 6 colour set. The greys are gamma adjusted
-from the original values (8-bit &AA,&77,&44) used on the Amiga, on the
-assumption that the Amiga's system gamma is 1/1.8.
 
-The equivalences between the colour numbers and true colours are canonical -
-this gives an exact equivalence mapping from @set_colour to @set_true_colour.
+This is the original Amiga Version 6 colour set. The colours have been gamma
+adjusted from the original 8-bit values used on the Amiga, on the assumption
+that the Amiga's system gamma is 1/1.8, using the following formula:
+
+  Z component = 31 * [(Amiga component / 15) ^ (1.8/2.2)]
+
+The equivalences between the colour numbers and true colours are recommended.
+The interpreter may allow the user to change the mapping, but the given
+values should be the default. If necessary, the game can check what true
+colour is being used for a given colour number using window properties 17 and
+18.
 
 Interpreters may provide different colours (eg making colour 10 dark grey),
 but if and only if they can detect they are running an original Infocom story
