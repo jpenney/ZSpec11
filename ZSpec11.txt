@@ -1,3 +1,4 @@
+
                       Z-Machine Standard 1.1 Proposal
                       -------------------------------
 
@@ -35,6 +36,10 @@ areas. Instead, a warning should be issued to the user before proceeding.
 Of course, whereever possible games should have alternative behaviour
 automatically invoked for older interpreters.
 
+As with the rest of the Standard, all references to Version 5 in this
+document apply equally to Versions 7 and 8.
+
+
 
                           UPDATES/CLARIFICATIONS
                           ======================
@@ -57,11 +62,14 @@ dictionary words.
 
 Header capabilities bits
 ------------------------
-The bits in the header indicating availability of sound or graphics should
-ideally be set reflecting current availability, rather than general support.
-In other words, if no Blorb (or other) resources for this story file have
-been found, or if the Blorb file contains no graphics or no sound, the
-corresponding bits should be cleared.
+The (Version 6) sound and graphics bits in Flags 1 indicate general
+availability of sound and graphics - ie whether the associated opcodes are
+available and functional.
+
+The bits in Flags 2 and 3 should ideally be set reflecting current
+availability, rather than general support. In other words, if no Blorb (or
+other) resources for this story file have been found, or if the Blorb file
+contains no graphics or no sound, the corresponding bits should be cleared.
 
 Also, it is recommended that interpreters that would prompt for an auxiliary
 Blorb file should do so immediately on start up if any of the "game wants to
@@ -90,6 +98,28 @@ interpreter authors must support it in Version 5. Support in Version 6 is not
 required.
 
 
+Indirect variable references
+----------------------------
+In the seven opcodes that take indirect variable references (inc, dec,
+inc_chk, dec_chk, load, store, pull), an indirect reference to the stack
+pointer does not push or pull the top item of the stack - it is read
+or written in place.
+
+
+Version 6 windows
+-----------------
+Interpreter authors are advised that all 8 windows in Version 6 must be
+treated identically. The only ways in which they are distinguished are:
+
+   * Different default positions + sizes
+   * Different default attributes
+   * @split_window manipulates windows 0 and 1 specifically
+   * Window 1 is the default mouse window
+
+Differences in interpreter behaviour should only arise from differences in
+window attributes and properties.
+
+
 @set_text_style
 ---------------
 It was previously unclear in the Standard whether instructions like 
@@ -108,7 +138,15 @@ However, Standard 1.1 does now require such combinations in a single
 opcode to be supported, as they are in some of Infocom's later
 interpreters - see below. But unless a game absolutely requires
 Standard 1.1 anyway (eg for true colour support), it is probably best
-to request only one style per opcode for Standard 1.0 compatibility.
+to request only one style per opcode for backwards compatibility.
+
+
+@set_font
+---------
+Font 2 (the picture font) is undefined. No interpreter should implement it,
+and set_font 2 should always return 0. Any new fonts will have numbers
+higher than 4. Fonts 5-1023 are reserved for future Standards to specify.
+Local use may be made of higher font numbers.
 
 
 @get_prop_len
@@ -135,6 +173,11 @@ In V6, it is legal to position the cursor up against the right or bottom of a
 window - eg at (1,1) in a zero-sized window or at (641,401) in 640x400
 window. Indeed, this is the default state of windows 1 to 7, and the cursor
 may be left at the right-hand side of a window when wrapping is off.
+
+Attempting to print text (including new-lines) when the cursor is less than
+font_height units from the bottom of the window results in undefined
+behaviour - this precludes any printing in windows less than font_height
+units high.
 
 
 @split_window
@@ -228,6 +271,31 @@ use multiple sound channels and the interpreter can handle it, and a bit
 to indicate the availability of music.
 
 
+Volume guidelines
+-----------------
+[ This would better live in the Blorb specification, but is partly
+  Z-machine specific. ]
+
+When using Blorb resources, the default interpreter behaviour (unless over-
+ridden by the player) should be for samples played at maximum volume (64) in
+one channel of a SONG or MOD played at volume 8 to be of equal volume to
+samples played at maximum volume (8) as an effect. This will be the natural
+behaviour if effects use one physical channel and MODs/SONGs use four
+physical channels.
+
+Ideally, a sound played at volume <n> in a SONG played at volume <m> should
+sound the same as when played as an effect at volume <n*m/64>. This mandates
+that the volume scale for effects be equivalent to the scale defined for
+samples in the MOD specification.
+
+If multi-channel effects are used, the overall volume should be independent
+of the number of channels used in the sound. Thus a stereo AIFF containing
+the same samples for left and right should sound as loud as a mono AIFF
+containing the same data. This will need adjustment of volume if stereo AIFFs
+use two physical channels and mono AIFFs use one. No adjustment would be
+required if an interpreter reduced all AIFFs to mono.
+
+
 Colour numbers
 --------------
 The presence of the "under the cursor" colour option, and in Standard 1.1
@@ -283,7 +351,7 @@ formats).
 
 Header Extension
 ----------------
-If the interpreter claims Standard 1.1 compliance than it supports the
+If the interpreter claims Standard 1.1 compliance then it supports the
 following extra words in the header extension table. If the header
 extension table is present, and the extra words are present, then a
 Standard 1.1 interpreter will examine and update them.
@@ -291,17 +359,21 @@ Standard 1.1 interpreter will examine and update them.
 If the interpreter is not Standard 1.1, then the extra words will be ignored.
 Guidelines on behaviour in this case are supplied in the descriptions below.
 
+Note that the header extension table itself is a Version 5 feature, so the
+extra information here is not available in earlier versions, despite the
+fact that some fields could be applicable.
+
 The new flags are placed in a new word, rather than in Flags 2 to minimize
 potential compatibility problems. To prevent future compatibility problems,
 all reserved bits in the Flags 3 word MUST be cleared by the interpreter.
 
 Word  V  Dyn Int Rst  Contents
 ---- --- --- --- ---  --------------------------------
- 4    3               Flags 3:
-      4       *   *   0: All text style combinations available?
+ 4    5               Flags 3:
+      5       *   *   0: All text style combinations available?
       5       *   *   1: Multiple colours available?
-      3       *   *   8: If set, game wants to use music
-      3       *   *   9: If set, game wants multiple sound channels
+      5       *   *   8: If set, game wants to use music
+      5       *   *   9: If set, game wants multiple sound channels
       6       *   *   10: If set, game wants to use transparency
                       (For bits 8-10, Int clears again if it cannot provide
                        the requested effect).
@@ -487,7 +559,7 @@ operations.
 The intent is to make it possible to superimpose text on non-uniform images.
 Up until now, only uniform images could be satisfactorily written on
 by sampling the background colour - that in itself would be problematical if
-the interpreter used dithering..
+the interpreter used dithering.
 
 Scrolling with the background set to transparent is not permitted, so
 transparent should only be requested in a non-scrolling window. It is not
@@ -537,7 +609,7 @@ file.
 
 @set_true_colour
 ----------------
-New opcode in Standard 1.1, for Version 5 or later.
+New opcode in Standard 1.1, for Version 5 or later, if Flags 1 bit 0 is set.
 
 EXT:13 D 5 @set_true_colour foreground background
          6 @set_true_colour foreground background window
@@ -598,16 +670,16 @@ and then written back.
 
 @sound_data
 -----------
-New opcode in Standard 1.1, for Version 5 or later.
+New opcode in Standard 1.1, for Version 5 or later, if Flags 1 bit 5 is set.
 
 EXT:14 E 5 sound_data sound-number array ?(label)
 
 Asks the interpreter for data on the sound with the given number. If the
 sound number is valid, and the sound is of a type supported by the
 intepreter, a branch occurs and information is written to the
-array: the type (1 for effect, 2 for music) in word 0, and playing
-status in word 1. (This is an array, not a "table" with initial size
-information.) 
+array: the type (1 for effect, 2 for music) in word 0, playing
+status in word 1, and channel availability in word 2. (This is an array, not
+a "table" with initial size information.) 
 
 Otherwise, if the sound number is zero, the interpreter writes the number of
 available (and supported) sounds into word 0 of the array and the release
@@ -621,6 +693,11 @@ is currently playing, the playing status is the length of time that the
 sound has been playing, in tenths of a second, clamped to a maximum of 3276.7
 seconds. If the sound is playing on multiple channels, it is the longest
 running channel's playing time that is indicated.
+
+The channel availability word is set to 0 if playing the sound will not
+result in any other sounds being stopped. Otherwise the availability word
+contains the number of a sound that will be interrupted by playing this
+sound.
 
 
 @sound_effect
@@ -645,14 +722,22 @@ However, there are an undefined number of sound channels available. When an
 interpreter runs out of channels of a particular type, and an additional call
 to @sound_effect is made, the sound with the highest resource number of the
 same type is stopped (without its callback routine being called) and the new
-sound is played.
+sound is played. It may be that playing a sound interrupts more than one
+sounds - for example a stereo effect could interrupt two mono effects.
+
+Sounds of different types can never interrupt each other - the channels used
+for music and effects are independent. As a corollary to this, it may be that
+more effects channels are available if the game does not ask to use music.
 
 The highest resource number rule allows an author to indicate the
 "importance" of each sound.
 
-The same sound can be played on more than one channel. In the event of
-channel exhaustion, it is the "oldest" play of the sound with the highest
-resource number that gets stopped first.
+The same sound can be played on more than one channel, with different
+volumes, repeats and callback routines. In the event of channel exhaustion,
+it is the "oldest" play of the sound with the highest resource number that
+gets stopped first.
+
+@sound_effect <n> 3 (or 4) stops all plays of sound <n>.
 
 The original Standard 1.0 + Blorb 1.1 behaviour is equivalent to the new
 scheme with one channel each of effects and music.
@@ -667,8 +752,10 @@ St Br Opcode Hex V Inform name and syntax
       EXT:13 D   5 set_true_colour foreground background
                  6 set_true_colour foreground background window
    *  EXT:14 E   5 sound_data sound-number array ?(label)
-*     EXT:29 1E  6 buffer_screen mode -> (result)
+*     EXT:29 1D  6 buffer_screen mode -> (result)
 
 set_true_colour is not a good candidate for taking a 2OP encoding like
 set_colour, as it will have a low usage frequency, and it will rarely take
 small constants.
+
+
