@@ -40,6 +40,14 @@ automatically invoked for older interpreters.
 As with the rest of the Standard, all references to Version 5 in this
 document apply equally to Versions 7 and 8.
 
+The word SHOULD in this document denotes a strong recommendation -
+implementors may take other action if they have a good reason.
+
+Other specific phrasing, such as MUST, SHALL, WILL, DOES or ARE, indicates an
+absolute requirement of the Standard. Any deviation indicates non-compliance.
+
+
+
 
 
                           UPDATES/CLARIFICATIONS
@@ -308,14 +316,14 @@ have been required since Standard 1.0; see S7.1.2.1.1.
 
 @read_mouse
 -----------
-@read_mouse is realtime.  When called it should read the current mouse
+@read_mouse is realtime.  When called it must read the current mouse
 location, whether or not the mouse is inside the current mouse window. Most
 modern interpreters get this wrong, but Infocom's interpreters behave this
 way. Interpreters are allowed to show positions and button states outside the
 Z-machine screen if the pointer is outside the interpreter's own user
 interface (using negative values if needed). 
 
-Programs should be prepared to cope with this. For example in a painting
+Programs must be prepared to cope with this. For example in a painting
 program you might want to ignore all buttons down outside the screen. When
 dragging something you might want to keep trying to follow the pointer, even
 outside the screen, until the buttons are released. 
@@ -475,19 +483,29 @@ window switches.
 Blorb
 -----
 Blorb is the standard resource format for the Z-machine. Games should be
-distributed either as a single story file, a story file with separate Blorb
-file, or a single executable Blorb file. The latter is expected to become the
-norm for multimedia games.
+distributed as
 
-As such, Standard 1.1 interpreters are expected to handle Blorb (v1.1) files,
-at least up to support for running a Z-code executable from within a Blorb
-file. If the interpreter supports sound or graphics, it should be able to
-obtain those resources from a Blorb file (although the Standard does not
-preclude other formats).
+    a) a single story file;
+    b) a story file with accompanying Blorb file;
+ or c) a stand-alone executable Blorb file.
+ 
+To minimise user confusion, Standard 1.1 interpreters should be able to run
+Z-code executables contained in either a plain story file, or embedded in a
+stand-alone Blorb file. If the interpreter supports sound or graphics, it
+should be able to obtain those resources from either a stand-alone or
+separate Blorb file (although the Standard does not preclude other formats).
 
 Embedded interpreters, or interpreters running on small platforms, may accept
-both Z-code and resources in some custom format, but these should come with
-some form of conversion utility.
+either Z-code or resources in some custom format, but these should come with
+some form of conversion utility. In the minimum case of a text-only
+interpreter, this might take the form of a Blorb to story file converter.
+
+
+Quetzal
+-------
+Quetzal is the standard saved game format for the Z-machine. Standard 1.1
+interpreters are recommended to save games in Quetzal format (by default),
+and to be able to load both compressed and uncompressed Quetzal files.
 
 
 Header Extension
@@ -511,53 +529,16 @@ all reserved bits in the Flags 3 word MUST be cleared by the interpreter.
 Word  V  Dyn Int Rst  Contents
 ---- --- --- --- ---  --------------------------------
  4    5               Flags 3:
-      5       *   *   0: All text style combinations available?
-      5       *   *   1: Multiple colours available?
-      5       *   *   8: If set, game wants to use music
-      5       *   *   9: If set, game wants multiple sound channels
-      6       *   *   10: If set, game wants to use transparency
-                      (For bits 8-10, Int clears again if it cannot provide
+      5       *   *   0: If set, game wants to use music
+      5       *   *   1: If set, game wants multiple sound channels
+      6       *   *   2: If set, game wants to use transparency
+                      (For all bits, Int clears again if it cannot provide
                        the requested effect).
  5    5       *   *   True default foreground colour
  6    5       *   *   True default background colour
 
 
-0: All text style combinations available?
-
-         An interpreter sets or clears this bit to indicate whether
-         it can provide all the text styles it supports in all
-         combinations.  If it can do Bold, Italic or Fixed, but not
-         Bold and Fixed at the same time this bit will be 0.  If it
-         doesn't support Italic at all (and has cleared Flags 1 bit 3
-         to specify this), but it does support combinations of the
-         remaining three styles it would set this bit to 1.
-
-         All combinations are required for font 1. Font 3 only requires
-         Roman and Reverse Video. Font 4 requires all combinations, except
-         that Fixed is ignored (because it is inherently fixed-pitch).
-
-         If the interpreter predates Standard 1.1, then text style
-         combinations may or may not be available; however until
-         Standard 1.1 interpreters were not required to handle
-         combinations of styles in a single @set_text_style call.
-         Combination effects should therefore be requested using
-         sequential calls (with the most important effect requested
-         last).
-
-1: Multiple colours available?
-
-         This bit is set to 1 if the interpreter can display multiple
-         text colours on screen at one time, and set to 0 if changing
-         the text colour changes all text on screen.
-
-         Preferred behaviour for Standard interpreters is to display
-         multiple colours. But if the interpreter predates Standard 1.1,
-         then generally its behaviour will depend on the machine type -
-         see section 8.3. If this flags word is present, then a Standard
-         interpreter should normally set the bit, and provide multiple
-         colours if at all possible, regardless of machine type.
-
-8: If set, game wants to use music
+0: If set, game wants to use music
 
         A game file that wishes to use music will set this bit.  If an
         interpreter can provide music (as described in the Blorb
@@ -575,10 +556,10 @@ Word  V  Dyn Int Rst  Contents
         then the interpreter may choose to act as though music were
         unsupported.
 
-9: If set, game wants multiple sound channels
+1: If set, game wants multiple sound channels
  
         If the game wishes to have multiple sound channels, it
-        should set this bit. This changes the behaviour of @sound_effect.
+        must set this bit. This changes the behaviour of @sound_effect.
         An interpreter must clear this bit if it can't play more than one
         sound of a given type a time.
 
@@ -590,7 +571,7 @@ Word  V  Dyn Int Rst  Contents
         piece of music simultaneously. More channels may be available (see
         @sound_effect section below for details).
 
-10: If set, game wants to use transparency
+2: If set, game wants to use transparency
 
         In Version 6 colour 15 is defined as transparent.  If an
         interpreter cannot provide transparency then it must clear
@@ -722,14 +703,18 @@ single @set_text_style opcode by adding the values (which are powers of two)
 together. If the parameter is non-zero, then all the styles given are
 activated. If the parameter is zero, then all styles are deactivated.
 
-If the "All text style combinations available?" bit is set in the header
-extension, then the interpreter is required to display a combination of all
-styles requested that it provides (i.e. if the interpreter can't display
-italic but a game file requests style 12 [Italic + Fixed] anyway, the
-interpreter would activate the Fixed style).  If the "Full font style
-combinations available" bit is not set, then the Interpreter will give
-precedence first to the most recent call to @set_text_style, and within that
-to the highest bit, making the priority Fixed, Italic, Bold, Reverse. 
+If the interpreter is unable to provide the requested style combination, it
+shall give precedence first to the styles requested in the most recent call
+to @set_text_style, and within that to the highest bit, making the priority
+Fixed, Italic, Bold, Reverse.
+
+Although a story file can determine which individual styles are available by
+inspecting the header, there is no indication of which styles can be
+combined. To improve this situation, at least for Version 6, Standard 1.1
+requires window property 10 to show the actual style combination currently in
+use; with this a story file can probe for the availability of particular
+combinations. Pre-existing interpreters may or may not already do this
+correctly.
 
 
 @set_font
@@ -805,6 +790,16 @@ Interpreters may provide different colours (eg making colour 10 dark grey),
 but if and only if they can detect they are running an original Infocom story
 file.
 
+Standard 1.1 interpreters should support multiple text colours on-screen
+simultaneously, and not implement the Amiga-style behaviour described in
+Standard 1.0 (changing all text already on screen to the current colour). If
+the multiple-colour model is in use, the interpreter number header byte must
+not be set to "Amiga" (4), except by explicit user action, as this has
+historically been examined to determine the colour model in use.
+
+When running story files in which the Flags 3 word is present, the multiple-
+colour model must be used.
+
 
 @set_true_colour
 ----------------
@@ -823,7 +818,7 @@ Magic values in the opcode are: (-1) = default setting
                                 (-3) = colour under cursor (V6 only)
                                 (-4) = transparent (V6 only)
 
-The interpreter should set the closest approximations available to
+The interpreter selects the closest approximations available to
 the requested colours. In V6, the interpreter may store the approximations
 in window properties 16 and 17, so the program can tell how close it got
 (although it is acceptable for the interpreter to just store the requested
