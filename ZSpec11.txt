@@ -16,6 +16,7 @@ the following aims:
    4) To add some extensions for use with Blorb
    5) To add some simple extensions to the Version 5 and Version 6
       screen models to increase flexibility
+   6) To allow easier access to arbitrary Unicode characters
 
 As ever, interpreters *FULLY* implementing this Standard (apart from any
 optional parts whose absence are signalled through header bits) for a given
@@ -51,13 +52,106 @@ limitation was an artificial one imposed by the Inform compiler - this has
 now been addressed by a compiler patch.
 
 
+Character set
+-------------
+In the past, not just in the Z-machine world, there has been general
+confusion over the rendering of ASCII/ZSCII/Latin-1/Unicode characters $27
+and $60. For the Z-machine, the traditional interpretations of
+right-single-quote/apostrophe and left-single-quote are preferred over the
+modern neutral-single-quote and grave accent - see Table 2A of the Inform
+Designer's Manual. $22 is a neutral double-quote.
+
+An alternative rendering is to interpret both $27 and $60 as neutral quotes,
+but interpreting $60 as a grave accent is to be avoided.
+
+No doubt aware of this confusion, Infocom never used character $60, and used
+$27 almost exclusively as an apostrophe - hardly any single quotes appear in
+Infocom games. Modern authors would do well to follow their lead.
+
+The few Infocom games that do use single quotes use $27 for both opening and
+closing - but even on many of their interpreters this looked a little odd, so
+suggesting that $27 be a right quote introduces no extra compatibility
+problems.
+
+* Notes on smartening output
+
+Interpreters can easily convert $22 into opening and closing double quotes
+automatically if they desire. Adjustment of $27 and $60 is ill-advised, due
+to the difficulty in distinguishing single-quotes from apostrophes - witness
+the following examples from various Infocom games:
+
+    "I'm Wiggins, 'ead o' the Baker Street Irregulars."
+    ... a majority of people agree our school system is 'out of control.'"
+    ... agreed that 2051, '61, and '71 all looked disturbing. ...
+    [Too bad there's no scratch 'n' sniff for this one, huh?]
+    The word 'examne' isn't in your vocabulary.
+
+Thus if authors want to have smart single quotes, it is up to them to
+correctly use opening ($60) and closing ($27) forms.
+
+One possible heuristic for an interpreter to elegantly handle both types of
+quoting would be to initially treat $27 as a neutral quote, except when
+occurring between two letters, when it is clearly an apostrophe. As soon as a
+$60 is printed, it is clear that the game is intending to use smart quotes,
+so $27 from then on should always be a right quote.
+
+There is a similar problem with character $2D, which could be hyphen, minus
+or a dash. When proportional fonts are used these forms should look very
+different, so $2D is a candidate for interpreter smartening. By default it
+should be assumed to be a hyphen, but conventional forms worth spotting are
+" - " to represent an en-dash and " -- " to represent an em-dash, although
+such smartening mustn't be applied when the game has requested fixed-pitch.
+"-" immediately preceding a digit could be converted to a minus.
+
+
 Encoded text
 ------------
-Many of Infocom's interpreters (and some subsequent interpreters, such as
-ITF's) treat multiple consecutive Z-characters 4 and 5 as shift locks,
-contrary to the Standard. As a result, story files should not use multiple
-consecutive 4 or 5 codes except for padding at the end of strings and
-dictionary words.
+In Version 3 and later, many of Infocom's interpreters (and some subsequent
+interpreters, such as ITF's) treat two consecutive Z-characters 4 or 5 as
+shift locks, contrary to the Standard. As a result, story files should not
+use multiple consecutive 4 or 5 codes except for padding at the end of
+strings and dictionary words. In any case, these shift locks are not used in
+dictionary words, or any of Infocom's story files.
+
+Two extra rules apply to encoding text for dictionary words in Versions 1 and
+2 only (see 3.7). If the truncation to 6 Z-characters leaves a multi-
+Z-character construction incomplete, the end-bit of the last word is not set.
+Also, shift-lock Z-characters 4 and 5 should be used instead of the
+single-shift Z-characters 2 and 3 when the next two characters come from the
+same alphabet. These two rules affect the dictionary of Zork I, which
+contains "nasty-" (looking), "storm-" (tossed) and "pdp10". Arguably, the
+first rule could be a bug, but the 3 extant V1 and V2 files are consistent.
+The games are still winnable without access to those dictionary words.
+
+
+Unicode
+-------
+The Z-machine is not expected to handle complex Unicode formatting like
+combining characters, bidirectional formatting and unusual line-wrapping
+rules - it remains firmly based in the world of left-to-right text with space
+breaks between words - every character is viewed as separate spacing glyph.
+
+All output is in presentation order, from left to right. To handle languages
+like Arabic or Hebrew, text would have to be output "visually", with manual
+line breaks (possibly via an in-game formatting engine).
+
+Far eastern languages are generally straightforward, except they usually use
+no spaces, and line wraps can occur almost anywhere. The easiest to way to
+handle this would be for the game to turn off buffering. A more sophisticated
+game might include its own formatting engine. Also, fixed-space output is
+liable to be problematical with most Far Eastern fonts, which use a mixture
+of "full width" and "half width" forms - all half-width characters would have
+to be forced to full width.
+
+The only way to output arbitrary Unicode characters in Standard 1.0 is one
+character at a time with the @print_unicode opcode. Standard 1.1 adds Unicode
+string printing - see below.
+   
+The Z-machine does not provide access to non-BMP characters (ie characters
+outside the range U+0000 to U+FFFF).
+
+Unicode characters U+0000 to U+001F and U+007F to U+009F are control codes,
+and must not be used.
 
 
 Header capabilities bits
@@ -106,6 +200,12 @@ pointer does not push or pull the top item of the stack - it is read
 or written in place.
 
 
+@art_shift and @log_shift
+-------------------------
+The "places" operand must be in the range -15 to +15, otherwise behaviour
+is undefined.
+
+
 Version 6 windows
 -----------------
 Interpreter authors are advised that all 8 windows in Version 6 must be
@@ -143,10 +243,10 @@ to request only one style per opcode for backwards compatibility.
 
 @set_font
 ---------
-Font 2 (the picture font) is undefined. No interpreter should implement it,
-and set_font 2 should always return 0. Any new fonts will have numbers
-higher than 4. Fonts 5-1023 are reserved for future Standards to specify.
-Local use may be made of higher font numbers.
+Font 2 (the picture font) is undefined. No Standard interpreter should
+implement it, and set_font 2 should always return 0. Any new fonts will have
+numbers higher than 4. Fonts 5-1023 are reserved for future Standards to
+specify. Local use may be made of higher font numbers.
 
 
 @get_prop_len
@@ -174,7 +274,7 @@ window - eg at (1,1) in a zero-sized window or at (641,401) in 640x400
 window. Indeed, this is the default state of windows 1 to 7, and the cursor
 may be left at the right-hand side of a window when wrapping is off.
 
-Attempting to print text (including new-lines) when the cursor is less than
+Attempting to print text (including new-lines) when the cursor is fewer than
 font_height units from the bottom of the window results in undefined
 behaviour - this precludes any printing in windows less than font_height
 units high.
@@ -220,8 +320,8 @@ required.
 Previous revisions of the Standard stated that mouse buttons were numbered in
 the following fashion: "low bits on the right of the mouse, rising as one
 looks left".  This is a rather non-portable implementation and should be
-abandoned in modern interpreters in favor of the 'primary' button being the
-lowest bit, the 'secondary' (if present) being the next lowest bit, etc. The
+abandoned in modern interpreters in favour of the "primary" button being the
+lowest bit, the "secondary" (if present) being the next lowest bit, etc. The
 ordering of buttons should be that which is most natural for the host system.
 
 
@@ -236,7 +336,7 @@ To clarify:
 
     @sound_effect number 3/4
 
-will stop (and optionally unload) sound 'number' if it is currently playing
+will stop (and optionally unload) sound "number" if it is currently playing
 (or loaded). Otherwise it is ignored.
 
     @sound_effect 0 3/4
@@ -277,8 +377,8 @@ Volume guidelines
   Z-machine specific. ]
 
 When using Blorb resources, the default interpreter behaviour (unless over-
-ridden by the player) should be for samples played at maximum volume (64) in
-one channel of a SONG or MOD played at volume 8 to be of equal volume to
+ridden by the player) should be for samples played at maximum volume (64), in
+one channel of a SONG or MOD played at volume 8, to be of equal volume to
 samples played at maximum volume (8) as an effect. This will be the natural
 behaviour if effects use one physical channel and MODs/SONGs use four
 physical channels.
@@ -314,8 +414,8 @@ implementation defined, except that:
          shown in property 11 should be >= 16.
 
 It is legal for interpreters to always show the same value in property 11 if
-a true or sampled colour is in use. As a result, story files cannot rely on
-setting a value that was read from the window property giving the same
+a true or sampled colour is in use. As a result, story files cannot assume
+that setting a value that was read from property 11 will give the same
 colour, if @set_true_colour or @set_colour -1 has been used in that window.
 
 The same rules apply if an interpreter offers non-standard default colours
@@ -352,18 +452,18 @@ formats).
 Header Extension
 ----------------
 If the interpreter claims Standard 1.1 compliance then it supports the
-following extra words in the header extension table. If the header
-extension table is present, and the extra words are present, then a
-Standard 1.1 interpreter will examine and update them.
+following extra words in the header extension table. If the header extension
+table is present, and the extra words are present, then a Standard 1.1
+interpreter will examine and update them.
 
 If the interpreter is not Standard 1.1, then the extra words will be ignored.
 Guidelines on behaviour in this case are supplied in the descriptions below.
 
 Note that the header extension table itself is a Version 5 feature, so the
-extra information here is not available in earlier versions, despite the
+extra information here is not available in earlier Versions, despite the
 fact that some fields could be applicable.
 
-The new flags are placed in a new word, rather than in Flags 2 to minimize
+The new flags are placed in a new word, rather than in Flags 2, to minimize
 potential compatibility problems. To prevent future compatibility problems,
 all reserved bits in the Flags 3 word MUST be cleared by the interpreter.
 
@@ -461,10 +561,88 @@ Word  V  Dyn Int Rst  Contents
 All other bits in the flags word must be cleared by the interpreter.
 
 
+Unicode in strings
+------------------
+In Standard 1.1, for Version 5 and later, a new mechanism for storing Unicode
+text in standard Z-machine strings is defined - the @print_unicode opcode in
+Standard 1.0 is not adequate to straightforwardly handle, say, a
+Japanese-language game, which would require widescale use of non-ZSCII
+characters.
+
+When encountered in Z-machine text, ZSCII characters 768-1023 are "Unicode
+escapes", which indicate that Unicode data follows.  The number of Unicode
+codepoints to follow is given by the ZSCII code minus 767.
+
+After reading a Unicode escape, the Z-machine starts reading Unicode at the
+next word. Once the designated number of Unicode characters have been read,
+text decoding resumes where it left off in the word where the Unicode escape
+was found. Once that word has been processed, the next word is read from
+after the Unicode sequence, unless the end-bit was set. This ordering will
+arise naturally from typical decoder implementations, so is easier to decode
+than to explain.
+
+The Unicode text is stored as a series of words, inverted to prevent casual
+browsing.
+
+This would be a typical usage:
+
+  "Japanese" in Japanese: (U+65E5 U+672C U+8A9E)
+  Z-characters: 5,6,24, 2,5,5, <Unicode>, <Unicode>, <Unicode>
+  Encoded:  $10DC $88A5 $D15F $98D3 $75D1
+
+The following examples demonstrate ordering:
+
+  "Zork<TM>" (<TM> = U+2122)
+  Z-characters: 4,31,20, 23,16,5, 6,24,0, <Unicode>
+  Encoded: $13F4 $5E05 $9B00 $DEDD
+
+  "Zor<TM>k"
+  Z-characters: 4,31,20, 23,5,6, 24,0,16, <Unicode>
+  Encoded: $13F4 $5CA6 $E010 $DEDD
+
+  "Zo<TM>rk"
+  Z-characters: 4,31,20, 5,6,24, 0,23,16, <Unicode>
+  Encoded: $13F4 $14D8 $82F0 $DEDD
+
+  "Z<TM>ork"
+  Z-characters: 4,31,5, 6,24,0, <Unicode>, 20,23,16
+  Encoded: $13E5 $1B00 $DEDD $D2F0
+
+[Occasional characters like that <TM> should normally be output using
+print_unicode (with a Standard interpreter check) for backwards
+compatibility.]
+
+ZSCII characters 768-1023 can only be encoded as a 4 Z-character sequence,
+leading to a basic overhead of 4 bytes on all pure Unicode strings.
+
+Unicode escapes can only be used in strings, not @print_char, and are not
+used when tokenising text.
+
+
+@xor
+----
+2OP:29 1D 1/* xor a b -> (result)
+
+Bitwise EXCLUSIVE OR.
+
+*** This opcode is new in Standard 1.1. On older interpreters it can be
+simulated with the following code sequence:
+
+   @not b -> sp;
+   @and a sp -> sp;
+   @not a -> sp;
+   @and sp b -> sp;
+   @or sp sp -> result;
+
+Because it can be simulated relatively straightforwardly with other opcodes,
+this opcode should be avoided unless a story file requires Standard 1.1
+anyway.
+
+
 @save and @restore
 ------------------
-EXT:0 0 5 save table bytes name prompt -> (result)
-EXT:1 1 5 restore table bytes name prompt -> (result)
+EXT:0 0 5/* save table bytes name prompt -> (result)
+EXT:1 1 5/* restore table bytes name prompt -> (result)
 
 As of Standard 1.1 an additional optional parameter, prompt, is allowed on
 Version 5 extended save/restore.  This allows a game author to tell the
@@ -481,7 +659,7 @@ interpreters do prompt for filenames, many modern ones do not.
 --------------
 New opcode in Standard 1.1, for Version 6
 
-EXT:29 1D 6 buffer_screen mode -> (result)
+EXT:29 1D 6/* buffer_screen mode -> (result)
 
 Interpreters may use a backing store to store the Z-machine screen state,
 rather than plotting directly to the screen. This would normally be the case
@@ -495,9 +673,9 @@ is always set to 0).
 When buffer_screen is set to 0 (the default), all display changes are
 expected to become visible to the user either immediately, or within a short
 period of time, at the interpreter's discretion. At a minimum, all updates
-would become visible before waiting for input. Any intermediate display
-states between input requests may not be seen; for example when printing a
-large amount of new text into a scrolling window, all the intermediate scroll
+become visible before waiting for input. Any intermediate display states
+between input requests may not be seen; for example when printing a large
+amount of new text into a scrolling window, all the intermediate scroll
 positions may or may not be shown.
   
 When buffer_screen is set to 1, the interpreter need not change the visible
@@ -535,7 +713,7 @@ to the highest bit, making the priority Fixed, Italic, Bold, Reverse.
 
 @set_font
 ---------
-EXT:4 4 6 set_font font window -> (result)
+EXT:4 4 6/- set_font font window -> (result)
 
 In Version 6, set_font has an optional window parameter, as for set_colour.
 This was part of the original Infocom design, but omitted by earlier
@@ -565,14 +743,14 @@ Scrolling with the background set to transparent is not permitted, so
 transparent should only be requested in a non-scrolling window. It is not
 valid to use Reverse Video style with the background set to transparent.
 
-Instructions that prompt for user input, such as @read and @save should be
+Instructions that prompt for user input, such as @read and @save, should be
 avoided when the background is set to transparent, as it will not generally
 be possible for text entry to take place satisfactorily in the absence of
 a defined background colour.
 
 Printing text multiple times on top itself with the background set to
 transparent should be avoided, as the interpreter may use anti-aliasing,
-resulting in the text getting progressively darker.
+resulting in the text getting progressively heavier.
 
 Standard 1.1 interpreters should provide the following basic colour
 set, regardless of machine type, in both Version 5 and Version 6:
@@ -611,8 +789,8 @@ file.
 ----------------
 New opcode in Standard 1.1, for Version 5 or later, if Flags 1 bit 0 is set.
 
-EXT:13 D 5 @set_true_colour foreground background
-         6 @set_true_colour foreground background window
+EXT:13 D 5/* @set_true_colour foreground background
+         6/* @set_true_colour foreground background window
 
 fg and bg are 15-bit colour values - bit 15 = 0
                                      bits 14-10 blue
@@ -662,17 +840,16 @@ These are not writable with @put_wind_prop.
 The true foreground and background colours show the actual colour being
 used for the foreground and background, whether it was set using @set_colour
 or @set_true_colour. Transparent is indicated as -4. If the colour was
-sampled from a picture, the value shown may be a 15-bit rounding of a
+sampled from a picture then the value shown may be a 15-bit rounding of a
 more precise colour, leading to a slight inaccuracy if the colour is read
 and then written back.
 
 
-
 @sound_data
 -----------
-New opcode in Standard 1.1, for Version 5 or later, if Flags 1 bit 5 is set.
+New opcode in Standard 1.1, for Version 5 or later. 
 
-EXT:14 E 5 sound_data sound-number array ?(label)
+EXT:14 E 5/* sound_data sound-number array ?(label)
 
 Asks the interpreter for data on the sound with the given number. If the
 sound number is valid, and the sound is of a type supported by the
@@ -699,6 +876,9 @@ result in any other sounds being stopped. Otherwise the availability word
 contains the number of a sound that will be interrupted by playing this
 sound.
 
+This opcode must be provided even if sound isn't supported (in which case it
+would always do nothing).
+
 
 @sound_effect
 -------------
@@ -723,7 +903,7 @@ interpreter runs out of channels of a particular type, and an additional call
 to @sound_effect is made, the sound with the highest resource number of the
 same type is stopped (without its callback routine being called) and the new
 sound is played. It may be that playing a sound interrupts more than one
-sounds - for example a stereo effect could interrupt two mono effects.
+sound - for example a stereo effect could interrupt two mono effects.
 
 Sounds of different types can never interrupt each other - the channels used
 for music and effects are independent. As a corollary to this, it may be that
@@ -732,10 +912,10 @@ more effects channels are available if the game does not ask to use music.
 The highest resource number rule allows an author to indicate the
 "importance" of each sound.
 
-The same sound can be played on more than one channel, with different
-volumes, repeats and callback routines. In the event of channel exhaustion,
-it is the "oldest" play of the sound with the highest resource number that
-gets stopped first.
+The same sound can be played on more than one channel, with different volumes,
+repeats and callback routines. In the event of channel exhaustion, it is the
+"oldest" play of the sound with the highest resource number that gets stopped
+first.
 
 @sound_effect <n> 3 (or 4) stops all plays of sound <n>.
 
@@ -745,17 +925,16 @@ scheme with one channel each of effects and music.
 
 New opcode summary:
 -------------------
-St Br Opcode Hex V Inform name and syntax
-*     EXT:0  0   5 save table bytes name prompt -> (result)
-*     EXT:1  1   5 restore table bytes name prompt -> (result)
-*     EXT:4  4   6 set_font font window -> (result)
-      EXT:13 D   5 set_true_colour foreground background
-                 6 set_true_colour foreground background window
-   *  EXT:14 E   5 sound_data sound-number array ?(label)
-*     EXT:29 1D  6 buffer_screen mode -> (result)
+St Br Opcode Hex V   Inform name and syntax
+*     2OP:29 1D  1/* xor a b -> (result)
+*     EXT:0  0   5/* save table bytes name prompt -> (result)
+*     EXT:1  1   5/* restore table bytes name prompt -> (result)
+*     EXT:4  4   6/- set_font font window -> (result)
+      EXT:13 D   5/* set_true_colour foreground background
+                 6/* set_true_colour foreground background window
+   *  EXT:14 E   5/* sound_data sound-number array ?(label)
+*     EXT:29 1D  6/* buffer_screen mode -> (result)
 
 set_true_colour is not a good candidate for taking a 2OP encoding like
 set_colour, as it will have a low usage frequency, and it will rarely take
 small constants.
-
-
