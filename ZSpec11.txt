@@ -1,5 +1,6 @@
 
                       Z-Machine Standard 1.1 Proposal
+                                  draft 8
                       -------------------------------
 
                    Authors: Kevin Bracey & Jason C. Penney
@@ -47,15 +48,12 @@ Other specific phrasing, such as MUST, SHALL, WILL, DOES or ARE, indicates an
 absolute requirement of the Standard. Any deviation indicates non-compliance.
 
 
-
-
-
                           UPDATES/CLARIFICATIONS
                           ======================
 
 Memory layout
 -------------
-Version 6 and 7 story files are both limited to 512K, not 320K. The 320K
+Version 6 and 7 story files are both limited to 512K , not 320K. The 320K
 limitation was an artificial one imposed by the Inform compiler - this has
 now been addressed by a compiler patch.
 
@@ -467,11 +465,6 @@ interrupts the current effect, but not the music, and vice versa. Whether
 loading a new sound (with @sound_effect n 1) stops the current one is
 implementation defined.
 
-As of Standard 1.1, there is a header bit to indicate that the game wants to
-use multiple sound channels and the interpreter can handle it, and a bit
-to indicate the availability of music.
-
-
 Volume guidelines
 -----------------
 [ This would better live in the Blorb specification, but is partly
@@ -562,7 +555,7 @@ unicode support, etc) after loading.
 
 Blorb
 -----
-Blorb is the standard resource format for the Z-machine. Games should be
+Blorb is the preferred resource format for the Z-machine. Games should be
 distributed as
 
     a) a single story file;
@@ -633,49 +626,14 @@ all reserved bits in the Flags 3 word MUST be cleared by the interpreter.
 Word  V  Dyn Int Rst  Contents
 ---- --- --- --- ---  --------------------------------
  4    5               Flags 3:
-      5       *   *   0: If set, game wants to use music
-      5       *   *   1: If set, game wants multiple sound channels
-      6       *   *   2: If set, game wants to use transparency
+      6       *   *   0: If set, game wants to use transparency
                       (For all bits, Int clears again if it cannot provide
                        the requested effect).
  5    5       *   *   True default foreground colour
  6    5       *   *   True default background colour
 
 
-0: If set, game wants to use music
-
-        A game file that wishes to use music will set this bit.  If an
-        interpreter can provide music (as described in the Blorb
-        specification) it must leave the bit set; if it is unable to
-        do this, it must clear the bit.  If this bit is set then a
-        minimum of two sound channels exist, one for effects and one
-        for music.
-
-        If this flags word is not present, or the interpreter predates
-        Standard 1.1, then there is no way to tell whether music is
-        available. If an interpreter doesn't support music, then
-        @sound_effect opcodes requesting music will be ignored.
-
-        If a game that supplies this flags word does not set this bit,
-        then the interpreter may choose to act as though music were
-        unsupported.
-
-1: If set, game wants multiple sound channels
- 
-        If the game wishes to have multiple sound channels, it
-        must set this bit. This changes the behaviour of @sound_effect.
-        An interpreter must clear this bit if it can't play more than one
-        sound of a given type a time.
-
-        Interpreters predating standard 1.1 will not support multiple
-        sound channels, and will act as though this bit is clear.
-
-        The minimum requirement on an interpreter that sets this bit is
-        that it can play at least two mono effects and one (4-channel)
-        piece of music simultaneously. More channels may be available (see
-        @sound_effect section below for details).
-
-2: If set, game wants to use transparency
+0: If set, game wants to use transparency
 
         In Version 6 colour 15 is defined as transparent.  If an
         interpreter cannot provide transparency then it must clear
@@ -829,7 +787,8 @@ In Version 6, set_font has an optional window parameter, as for set_colour.
 This was part of the original Infocom design, but omitted by earlier
 Standards. It is reinstated here, as it is useful to be able to measure
 a font that is about to be used in another window, so that window can be
-sized before attempting to place the cursor in it.
+sized before attempting to place the cursor in it.  A window number of -3
+signifies "the currently selected window"
 
 
 @set_colour
@@ -970,84 +929,6 @@ sampled from a picture then the value shown may be a 15-bit rounding of a
 more precise colour, leading to a slight inaccuracy if the colour is read
 and then written back.
 
-
-@sound_data
------------
-New opcode in Standard 1.1, for Version 5 or later. 
-
-EXT:14 E 5/* sound_data sound-number array ?(label)
-
-Asks the interpreter for data on the sound with the given number. If the
-sound number is valid, and the sound is of a type supported by the
-intepreter, a branch occurs and information is written to the
-array: the type (1 for effect, 2 for music) in word 0, playing
-status in word 1, and channel availability in word 2. (This is an array, not
-a "table" with initial size information.) 
-
-Otherwise, if the sound number is zero, the interpreter writes the number of
-available (and supported) sounds into word 0 of the array and the release
-number of the sounds file (eg from the Blorb RelN chunk) into word 1. A
-branch occurs if the number of sounds is non-zero.
-
-Otherwise, nothing happens.
-
-The playing status is -1 if the sound is not currently playing. If the sound
-is currently playing, the playing status is the length of time that the
-sound has been playing, in tenths of a second, clamped to a maximum of 3276.7
-seconds. If the sound is playing on multiple channels, it is the longest
-running channel's playing time that is indicated.
-
-The channel availability word is set to 0 if playing the sound will not
-result in any other sounds being stopped. Otherwise the availability word
-contains the number of a sound that will be interrupted by playing this
-sound.
-
-This opcode must be provided even if sound isn't supported (in which case it
-would always do nothing).
-
-
-@sound_effect
--------------
-Standard 1.1 adds new behaviour to @sound_effect (but see the clarifications
-section above for notes on pre-1.1 behaviour).
-
-As of Standard 1.1, there is a header bit to indicate that the game wants to
-use multiple sound channels and the interpreter can handle it.
-
-If the multiple sound channels bit is clear (or not present), then the
-interpreter behaves as per Standard 1.0 + Blorb 1.1 - see above for
-clarifications.
-
-If the multiple sound channels bit is set, then the interpreter does not stop
-any current sound when a new one is played or loaded - it only stops a sound
-when explicitly asked to, or when it has played the specified number of
-repeats. That way, a game can play multiple sounds of the same type at once. 
-
-However, there are an undefined number of sound channels available. When an
-interpreter runs out of channels of a particular type, and an additional call
-to @sound_effect is made, the sound with the highest resource number of the
-same type is stopped (without its callback routine being called) and the new
-sound is played. It may be that playing a sound interrupts more than one
-sound - for example a stereo effect could interrupt two mono effects.
-
-Sounds of different types can never interrupt each other - the channels used
-for music and effects are independent. As a corollary to this, it may be that
-more effects channels are available if the game does not ask to use music.
-
-The highest resource number rule allows an author to indicate the
-"importance" of each sound.
-
-The same sound can be played on more than one channel, with different volumes,
-repeats and callback routines. In the event of channel exhaustion, it is the
-"oldest" play of the sound with the highest resource number that gets stopped
-first.
-
-@sound_effect <n> 3 (or 4) stops all plays of sound <n>.
-
-The original Standard 1.0 + Blorb 1.1 behaviour is equivalent to the new
-scheme with one channel each of effects and music.
-
-
 New opcode summary:
 -------------------
 St Br Opcode Hex V   Inform name and syntax
@@ -1056,7 +937,6 @@ St Br Opcode Hex V   Inform name and syntax
 *     EXT:4  4   6/- set_font font window -> (result)
       EXT:13 D   5/* set_true_colour foreground background
                  6/* set_true_colour foreground background window
-   *  EXT:14 E   5/* sound_data sound-number array ?(label)
 *     EXT:29 1D  6/* buffer_screen mode -> (result)
 
 set_true_colour is not a good candidate for taking a 2OP encoding like
