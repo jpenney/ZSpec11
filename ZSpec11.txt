@@ -103,6 +103,11 @@ should be assumed to be a hyphen, but conventional forms worth spotting are
 such smartening mustn't be applied when the game has requested fixed-pitch.
 "-" immediately preceding a digit could be converted to a minus.
 
+If an interpreter is able to output such typographical characters, it should
+also ensure that they are available manually via the appropriate Unicode code
+points (eg U+2018 and U+2019 for left and right single quotes), and that
+@check_unicode reports their presence or absence correctly.
+
 
 Encoded text
 ------------
@@ -203,7 +208,9 @@ or written in place.
 @art_shift and @log_shift
 -------------------------
 The "places" operand must be in the range -15 to +15, otherwise behaviour
-is undefined.
+is undefined. (This is because most interpreters will be implementing the
+opcodes using C's << and >> operators, and this is the range of ISO C
+standard-defined behaviour for shifts of a 16-bit type).
 
 
 Version 6 windows
@@ -234,11 +241,11 @@ style in turn, with the most important last, thus:
    @set_text_style 4;   ! Italic
    @set_text_style 1;   ! Reverse - overrides if combination not available
 
-However, Standard 1.1 does now require such combinations in a single
-opcode to be supported, as they are in some of Infocom's later
-interpreters - see below. But unless a game absolutely requires
-Standard 1.1 anyway (eg for true colour support), it is probably best
-to request only one style per opcode for backwards compatibility.
+However, Standard 1.1 does now require such combinations in a single opcode
+to be supported, as they are in some of Infocom's later interpreters - see
+below. But unless a game absolutely requires Standard 1.1 anyway (eg for true
+colour support), it is probably best to request only one style per opcode for
+backwards compatibility.
 
 
 @set_font
@@ -323,6 +330,15 @@ looks left".  This is a rather non-portable implementation and should be
 abandoned in modern interpreters in favour of the "primary" button being the
 lowest bit, the "secondary" (if present) being the next lowest bit, etc. The
 ordering of buttons should be that which is most natural for the host system.
+
+
+Mouse clicks
+------------
+In Version 5, mouse clicks are always represented with an input ZSCII code of
+254.
+
+In Version 6, a single click, or the first click of a double-click, is passed
+in as 254. The second click of a double-click is passed in as 253.
 
 
 @picture_data
@@ -442,11 +458,20 @@ window switches.
 
 Blorb
 -----
-Standard 1.1 interpreters are required to handle Blorb (v1.1) files, at least
-up to support for running a Z-code executable from within a Blorb file. If
-the interpreter supports sound or graphics, it must be able to obtain those
-resources from a Blorb file (although the Standard does not preclude other
-formats).
+Blorb is the standard resource format for the Z-machine. Games should be
+distributed either as a single story file, a story file with separate Blorb
+file, or a single executable Blorb file. The latter is expected to become the
+norm for multimedia games.
+
+As such, Standard 1.1 interpreters are expected to handle Blorb (v1.1) files,
+at least up to support for running a Z-code executable from within a Blorb
+file. If the interpreter supports sound or graphics, it should be able to
+obtain those resources from a Blorb file (although the Standard does not
+preclude other formats).
+
+Embedded interpreters, or interpreters running on small platforms, may accept
+both Z-code and resources in some custom format, but these should come with
+some form of conversion utility.
 
 
 Header Extension
@@ -617,26 +642,6 @@ leading to a basic overhead of 4 bytes on all pure Unicode strings.
 
 Unicode escapes can only be used in strings, not @print_char, and are not
 used when tokenising text.
-
-
-@xor
-----
-2OP:29 1D 1/* xor a b -> (result)
-
-Bitwise EXCLUSIVE OR.
-
-*** This opcode is new in Standard 1.1. On older interpreters it can be
-simulated with the following code sequence:
-
-   @not b -> sp;
-   @and a sp -> sp;
-   @not a -> sp;
-   @and sp b -> sp;
-   @or sp sp -> result;
-
-Because it can be simulated relatively straightforwardly with other opcodes,
-this opcode should be avoided unless a story file requires Standard 1.1
-anyway.
 
 
 @save and @restore
@@ -926,7 +931,6 @@ scheme with one channel each of effects and music.
 New opcode summary:
 -------------------
 St Br Opcode Hex V   Inform name and syntax
-*     2OP:29 1D  1/* xor a b -> (result)
 *     EXT:0  0   5/* save table bytes name prompt -> (result)
 *     EXT:1  1   5/* restore table bytes name prompt -> (result)
 *     EXT:4  4   6/- set_font font window -> (result)
@@ -938,3 +942,4 @@ St Br Opcode Hex V   Inform name and syntax
 set_true_colour is not a good candidate for taking a 2OP encoding like
 set_colour, as it will have a low usage frequency, and it will rarely take
 small constants.
+
