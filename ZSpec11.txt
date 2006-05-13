@@ -1,9 +1,10 @@
 
-                      Z-Machine Standard 1.1 Proposal
-                                  draft 9
+                      Z-Machine Standard 1.1 Document
                       -------------------------------
 
                    Authors: Kevin Bracey & Jason C. Penney
+                       Minor revisions: David Kinder
+
 
                                 INTRODUCTION
                                 ============
@@ -164,7 +165,7 @@ fixed-pitch bit after Version 4, and it is not implemented in at least some
 of their later interpreters.
 
 However, the fixed-pitch bit is modified by the "font" statement in
-Inform 6.21, so is used by many current Inform generated files. Therefore
+Inform 6, so is used by many current Inform generated files. Therefore
 interpreter authors must support it in Version 5. Support in Version 6 is not
 required.
 
@@ -511,6 +512,35 @@ unicode support, etc) after loading.
                                 ADDITIONS
                                 =========
 
+Blorb
+-----
+Blorb is the standard resource format for the Z-machine. Games should be
+distributed as
+
+    a) a single story file;
+    b) a story file with accompanying Blorb file;
+ or c) a stand-alone executable Blorb file.
+ 
+To minimise user confusion, Standard 1.1 interpreters should be able to run
+Z-code executables contained in either a plain story file, or embedded in a
+stand-alone Blorb 1.1 file. If the interpreter supports sound or graphics, it
+should be able to obtain those resources from either a stand-alone or
+separate Blorb 1.1 file (although the Standard does not preclude other
+formats).
+
+Embedded interpreters, or interpreters running on small platforms, may accept
+either Z-code or resources in some custom format, but these should come with
+some form of conversion utility. In the minimum case of a text-only
+interpreter, this might take the form of a Blorb to story file converter.
+
+
+Quetzal
+-------
+Quetzal is the standard saved game format for the Z-machine. Standard 1.1
+interpreters are recommended to be able to load Quetzal 1.4 files, and
+to save games in Quetzal 1.4 format by default.
+
+
 Header Extension
 ----------------
 If the interpreter claims Standard 1.1 compliance then it supports the
@@ -710,7 +740,7 @@ file.
 Standard 1.1 interpreters should support multiple text colours on-screen
 simultaneously, and not implement the Amiga-style behaviour described in
 Standard 1.0 (changing all text already on screen to the current colour). If
-the multiple-colour model is in use, the interpreter number header byte must
+the multiple-colour model is in use, the interpreter number header byte should
 not be set to "Amiga" (4), except by explicit user action, as this has
 historically been examined to determine the colour model in use.
 
